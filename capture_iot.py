@@ -8,9 +8,11 @@ import uuid
 import json
 import jwt 
 from tendo import singleton
-import paho.mqtt.client as mqtt 
+import paho.mqtt.client as mqtt
+import fractions
 
 me = singleton.SingleInstance() # will sys.exit(-1) if another instance of this program is already running
+token_life=60
 
 def parse_command_line_args():
     """Parse command line arguments."""
@@ -41,7 +43,7 @@ def parse_command_line_args():
             '--cloud_region', default='us-central1', help='GCP cloud region')
     parser.add_argument(
             '--ca_certs',
-            default='../.ssh/roots.pem',
+            default='/home/pi/.ssh/roots.pem',
             help=('CA root from https://pki.google.com/roots.pem'))
     parser.add_argument(
             '--mqtt_bridge_hostname',
@@ -80,10 +82,9 @@ def on_connect(unusued_client, unused_userdata, unused_flags, rc):
 def on_publish(unused_client, unused_userdata, unused_mid):
     print('on_publish')
 
-def createJSON(index, timestamp, intensity):
+def createJSON(timestamp, intensity):
     data = {
-    'index' : index,
-	'timecollected' : timestamp,
+	'timestamp' : timestamp,
 	'intensity' : intensity
     }
 
@@ -102,7 +103,6 @@ def main():
     sensorID = registry_id + "." + device_id
     googleMQTTURL = args.mqtt_bridge_hostname
     googleMQTTPort = args.mqtt_bridge_port
-    receiver_in = args.receiver_in
 
     _CLIENT_ID = 'projects/{}/locations/{}/registries/{}/devices/{}'.format(project_id, gcp_location, registry_id, device_id)
     _MQTT_TOPIC = '/devices/{}/events'.format(device_id)
@@ -119,12 +119,10 @@ def main():
         camera.sharpness=0
         camera.saturation=0
         time.sleep(2)
-
-        index=0
-
-        while True:
+        
+        exit=False
+        while not exit:
             try:
-                index+=1
                 client = mqtt.Client(client_id=_CLIENT_ID)
                 cur_time = datetime.datetime.utcnow()
                 # authorization is handled purely with JWT, no user/pass, so username can be whatever
@@ -146,15 +144,16 @@ def main():
                     output_gray=cv2.cvtColor(output,cv2.COLOR_BGR2GRAY)
                     intensity=np.average(output_gray)
                     print(f'[INFO] Time: {currentTime}, average intensity: {intensity:.2f}') 
-                    payload = createJSON(index, currentTime, intensity)
+                    payload = createJSON(currentTime, int(intensity))
                     client.publish(_MQTT_TOPIC, payload, qos=1)
                     print("{}\n".format(payload))   
                     cv2.imshow('Image',output)
                     cv2.waitKey(1000)
             except Exception as e:
                 print(f"Acquisition loop stopped: {e}")
+                exit=True
             
-            client.loop_stop()
+        client.loop_stop()
 
 if __name__ == '__main__':
 	main() 
