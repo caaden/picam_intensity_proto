@@ -1,8 +1,16 @@
 import time
+import datetime
 import picamera
 import numpy as np
 import cv2
-#import argparse
+import argparse
+import uuid
+import json
+import jwt 
+from tendo import singleton
+import paho.mqtt.client as mqtt 
+
+me = singleton.SingleInstance() # will sys.exit(-1) if another instance of this program is already running
 
 def parse_command_line_args():
     """Parse command line arguments."""
@@ -72,11 +80,11 @@ def on_connect(unusued_client, unused_userdata, unused_flags, rc):
 def on_publish(unused_client, unused_userdata, unused_mid):
     print('on_publish')
 
-def createJSON(index, timestamp, heartrate):
+def createJSON(index, timestamp, intensity):
     data = {
     'index' : index,
 	'timecollected' : timestamp,
-	'heartrate' : heartrate
+	'intensity' : intensity
     }
 
     json_str = json.dumps(data)
@@ -98,3 +106,56 @@ def main():
 
     _CLIENT_ID = 'projects/{}/locations/{}/registries/{}/devices/{}'.format(project_id, gcp_location, registry_id, device_id)
     _MQTT_TOPIC = '/devices/{}/events'.format(device_id)
+
+    with picamera.PiCamera() as camera:
+        camera.resolution = (640,480)
+        camera.framerate = 24
+        camera.exposure_mode='off' 
+        camera.awb_mode='off'
+        camera.shutter_speed=4000
+        camera.awb_gains=(fractions.Fraction(183, 128), fractions.Fraction(153, 128))  
+        camera.contrast=0
+        camera.brightness=50
+        camera.sharpness=0
+        camera.saturation=0
+        time.sleep(2)
+
+        index=0
+
+        while True:
+            try:
+                index+=1
+                client = mqtt.Client(client_id=_CLIENT_ID)
+                cur_time = datetime.datetime.utcnow()
+                # authorization is handled purely with JWT, no user/pass, so username can be whatever
+                client.username_pw_set(
+                    username='unused',
+                    password=create_jwt(cur_time, project_id, ssl_private_key_filepath, ssl_algorithm))
+                client.on_connect = on_connect
+                client.on_publish = on_publish
+                client.tls_set(ca_certs=root_cert_filepath) # Replace this with 3rd party cert if that was used when creating registry
+                client.connect(googleMQTTURL, googleMQTTPort)
+                jwt_refresh = time.time() + ((token_life - 1) * 60) #set a refresh time for one minute before the JWT expires
+                client.loop_start()
+                
+                # acquire image
+                while time.time()<jwt_refresh:
+                    output = np.empty((480, 640, 3), dtype=np.uint8) #swap x and y
+                    currentTime = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') 
+                    camera.capture(output, 'bgr') #open cv bgr format
+                    output_gray=cv2.cvtColor(output,cv2.COLOR_BGR2GRAY)
+                    intensity=np.average(output_gray)
+                    print(f'[INFO] Time: {currentTime}, average intensity: {intensity:.2f}') 
+                    payload = createJSON(index, currentTime, intensity)
+                    client.publish(_MQTT_TOPIC, payload, qos=1)
+                    print("{}\n".format(payload))   
+                    cv2.imshow('Image',output)
+                    cv2.waitKey(1000)
+            except Exception as e:
+                print(f"Acquisition loop stopped: {e}")
+            
+            client.loop_stop()
+
+if __name__ == '__main__':
+	main() 
+
