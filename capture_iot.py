@@ -124,7 +124,7 @@ def main():
         while not exit:
             try:
                 client = mqtt.Client(client_id=_CLIENT_ID)
-                cur_time = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f')
+                cur_time = datetime.datetime.utcnow()
                 # authorization is handled purely with JWT, no user/pass, so username can be whatever
                 client.username_pw_set(
                     username='unused',
@@ -139,7 +139,7 @@ def main():
                 # acquire image
                 while time.time()<jwt_refresh:
                     output = np.empty((480, 640, 3), dtype=np.uint8) #swap x and y
-                    currentTime = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S.%f')
+                    currentTime = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S') 
                     camera.capture(output, 'bgr') #open cv bgr format
                     output_gray=cv2.cvtColor(output,cv2.COLOR_BGR2GRAY)
                     intensity=np.average(output_gray)
