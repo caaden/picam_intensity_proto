@@ -143,8 +143,7 @@ def main():
                     camera.capture(output, 'bgr') #open cv bgr format
                     output_gray=cv2.cvtColor(output,cv2.COLOR_BGR2GRAY)
                     intensity=np.average(output_gray)
-                #     print("[INFO] Timestamp: ",currentTime)
-                    print(f'[INFO] Average intensity: {intensity:.2f}') 
+                    print(f'[INFO] Time: {currentTime}, average intensity: {intensity:.2f}') 
                     payload = createJSON(currentTime, intensity)
                     client.publish(_MQTT_TOPIC, payload, qos=1)
                     print("{}\n".format(payload))   
