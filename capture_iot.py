@@ -145,7 +145,7 @@ def main():
                     output_gray=cv2.cvtColor(output,cv2.COLOR_BGR2GRAY)
                     intensity=np.average(output_gray)
                     print(f'[INFO] Time: {currentTime}, average intensity: {intensity:.2f}') 
-                    payload = createJSON(currentTime, intensity)
+                    payload = createJSON(currentTime, intensity, "Rpi Data Point")
                     client.publish(_MQTT_TOPIC, payload, qos=1)
                     print("{}\n".format(payload))   
                     cv2.imshow('Image',output)
