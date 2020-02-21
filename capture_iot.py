@@ -82,9 +82,9 @@ def on_connect(unusued_client, unused_userdata, unused_flags, rc):
 def on_publish(unused_client, unused_userdata, unused_mid):
     print('on_publish')
 
-def createJSON(timestamp, intensity, name):
+def createJSON(time_collected, intensity, name):
     data = {
-	'timestamp' : timestamp,
+	'time_collected' : time_collected,
 	'intensity' : intensity, 
         'name' : name
     }
