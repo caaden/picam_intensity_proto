@@ -60,6 +60,8 @@ def parse_command_line_args():
             default=token_life,
             type=int,
             help=('Expiration time, in minutes, for JWT tokens.'))
+    parser.add_argument('--show_image',default=False,help=('Show image updates.'))
+
     return parser.parse_args()
 
 def create_jwt(cur_time, projectID, privateKeyFilepath, algorithmType):
@@ -92,6 +94,16 @@ def createJSON(time_collected, intensity, name):
     json_str = json.dumps(data)
     return json_str
 
+def str2bool(v):
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 def main():
     args = parse_command_line_args()
     project_id = args.project_id
@@ -104,6 +116,9 @@ def main():
     sensorID = registry_id + "." + device_id
     googleMQTTURL = args.mqtt_bridge_hostname
     googleMQTTPort = args.mqtt_bridge_port
+    show_image=args.show_image
+    show_image=str2bool(show_image)
+
 
     _CLIENT_ID = 'projects/{}/locations/{}/registries/{}/devices/{}'.format(project_id, gcp_location, registry_id, device_id)
     _MQTT_TOPIC = '/devices/{}/events'.format(device_id)
@@ -147,9 +162,12 @@ def main():
                     print(f'[INFO] Time: {currentTime}, average intensity: {intensity:.2f}') 
                     payload = createJSON(currentTime, intensity, "Rpi Data Point")
                     client.publish(_MQTT_TOPIC, payload, qos=1)
-                    print("{}\n".format(payload))   
-                    cv2.imshow('Image',output)
-                    cv2.waitKey(1000)
+                    print("{}\n".format(payload))
+                    if show_image:   
+                        cv2.imshow('Image',output)
+                        cv2.waitKey(1000)
+                    else:
+                        time.sleep(1)    
             except Exception as e:
                 print(f"Acquisition loop stopped: {e}")
                 exit=True
